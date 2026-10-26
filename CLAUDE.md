@@ -5,6 +5,8 @@
 ## 現状
 
 - GitHub Pages で公開する静的サイト。ビルド工程なし。
+  - 公開 URL：https://ashush-cpu.github.io/qb-timer/
+  - リポジトリ：https://github.com/ashush-cpu/qb-timer （main ブランチ直下を Pages で配信。push すると1分ほどで反映）
 - `index.html` 1ファイルに HTML / CSS / JS をインラインで記述。
 - PWA 対応（`manifest.webmanifest`、`sw.js`、`icons/`）。iPad / iPhone では Safari の「ホーム画面に追加」でアプリのように起動できる。
 - PC では「小窓」ボタン（Document Picture-in-Picture）で右上に常駐できる。対応はデスクトップ版 Chrome / Edge 116+、Firefox 151+。非対応環境ではボタン自体を出さない。
