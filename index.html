@@ -6,7 +6,7 @@
 <title>QB 解説3分タイマー</title>
 <meta name="description" content="QBの解説を3分読んでも分からなければスキップする、そのための静かなタイマー。">
 <!-- 外部から読み込むのは Google Fonts だけ。それ以外のスクリプト・接続・埋め込みを禁止する -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-z/HHTevAyspw2Nzstja8jrkiMKqn4n1/0F/kLSXFAlA='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-MeM+sCxJotX7raUVW5dYAuPOJzWmEUbLp1kP2oSH1AY='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#E6EBEE">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#172128">
@@ -433,9 +433,7 @@
 
   const PIP_CSS = `
     :root { --bg:#E6EBEE; --bg-over:#ECE3E1; --ink:#1E2B33; --ink-soft:#5B6B75; --line:#C7D0D6; --btn:#1E2B33; --btn-ink:#F2F5F7; color-scheme: light; }
-    @media (prefers-color-scheme: dark) {
-      :root { --bg:#172128; --bg-over:#261E22; --ink:#D5DEE3; --ink-soft:#82939D; --line:#2D3B44; --btn:#D5DEE3; --btn-ink:#172128; color-scheme: dark; }
-    }
+    :root[data-theme="dark"] { --bg:#172128; --bg-over:#261E22; --ink:#D5DEE3; --ink-soft:#82939D; --line:#2D3B44; --btn:#D5DEE3; --btn-ink:#172128; color-scheme: dark; }
     *, *::before, *::after { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; }
     body {
@@ -465,6 +463,11 @@
       const d = win.document;
       d.documentElement.lang = 'ja';
       d.title = 'QB 3分';
+      // 小窓は OS の配色を別に判定することがあるので、親画面の配色をそのまま引き継ぐ
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      const syncTheme = () => { d.documentElement.dataset.theme = mq.matches ? 'dark' : 'light'; };
+      syncTheme();
+      mq.addEventListener('change', syncTheme);
       const font = d.createElement('link');
       font.rel = 'stylesheet';
       font.href = 'https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500&display=swap';
