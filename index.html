@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>QB 解説3分タイマー</title>
+<meta name="description" content="QBの解説を3分読んでも分からなければスキップする、そのための静かなタイマー。">
+<!-- 外部から読み込むのは Google Fonts だけ。それ以外のスクリプト・接続・埋め込みを禁止する -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-z/HHTevAyspw2Nzstja8jrkiMKqn4n1/0F/kLSXFAlA='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#E6EBEE">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#172128">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="QB3分">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    --bg: #E6EBEE;
+    --bg-over: #ECE3E1;
+    --ink: #1E2B33;
+    --ink-soft: #5B6B75;
+    --line: #C7D0D6;
+    --fill: #4E7684;
+    --btn: #1E2B33;
+    --btn-ink: #F2F5F7;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #172128;
+      --bg-over: #261E22;
+      --ink: #D5DEE3;
+      --ink-soft: #82939D;
+      --line: #2D3B44;
+      --fill: #6F99A6;
+      --btn: #D5DEE3;
+      --btn-ink: #172128;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #172128;
+    --bg-over: #261E22;
+    --ink: #D5DEE3;
+    --ink-soft: #82939D;
+    --line: #2D3B44;
+    --fill: #6F99A6;
+    --btn: #D5DEE3;
+    --btn-ink: #172128;
+    color-scheme: dark;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { height: 100%; }
+  body {
+    height: 100%;
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Zen Kaku Gothic New", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", system-ui, sans-serif;
+    transition: background-color 2.5s ease;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body.over { background: var(--bg-over); }
+
+  .app {
+    height: 100%;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: clamp(16px, 3vw, 36px);
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 16px;
+  }
+
+  .bar { display: flex; justify-content: flex-end; gap: 8px; min-height: 44px; }
+  .tool {
+    font: inherit;
+    font-size: .9rem;
+    color: var(--ink-soft);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 10px 16px;
+    min-height: 44px;
+    cursor: pointer;
+  }
+  .tool[hidden] { display: none; }
+
+  /* タイマー画面 */
+  .stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(12px, 2vh, 24px);
+    min-height: 0;
+  }
+  .word {
+    font-weight: 400;
+    font-size: clamp(56px, min(16vw, 24vh), 160px);
+    line-height: 1;
+    letter-spacing: .12em;
+    padding-left: .12em;
+    transition: opacity .2s, color .3s;
+  }
+  body.ready .word { color: var(--ink-soft); }
+  body.paused .word { opacity: .4; }
+  .note {
+    margin: 0;
+    min-height: 1.6em;
+    font-size: 1rem;
+    color: var(--ink-soft);
+    letter-spacing: .02em;
+    text-align: center;
+  }
+
+  /* 積み上げ画面 */
+  .summary {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(8px, 1.6vh, 16px);
+    min-height: 0;
+    text-align: center;
+  }
+  body.view-summary .stage { display: none; }
+  body.view-summary .summary { display: flex; }
+  .thanks { margin: 0; min-height: 1.5em; color: var(--ink-soft); font-size: 1rem; letter-spacing: .04em; }
+  .today { margin: 0; line-height: 1; }
+  .today b {
+    font-weight: 400;
+    font-size: clamp(64px, min(18vw, 17vh), 132px);
+    letter-spacing: .01em;
+    font-variant-numeric: tabular-nums;
+  }
+  .today span { font-size: clamp(20px, 3vw, 28px); margin-left: .2em; color: var(--ink-soft); }
+  .sub { margin: 0; color: var(--ink-soft); font-size: 1rem; }
+  .grid {
+    --cell: clamp(12px, 2.2vw, 18px);
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(7, var(--cell));
+    grid-auto-columns: var(--cell);
+    gap: 4px;
+    margin-top: clamp(8px, 2vh, 20px);
+  }
+  .grid i { display: block; border-radius: 3px; background: var(--line); }
+  .grid i.l1, .grid i.l2, .grid i.l3, .grid i.l4 { background: var(--fill); }
+  .grid i.l1 { opacity: .3; }
+  .grid i.l2 { opacity: .55; }
+  .grid i.l3 { opacity: .8; }
+  .grid i.now { outline: 1.5px solid var(--ink-soft); outline-offset: 1.5px; }
+  .caption { margin: 0; color: var(--ink-soft); font-size: .85rem; }
+  .total { margin: clamp(4px, 1vh, 10px) 0 0; color: var(--ink-soft); font-size: .95rem; }
+
+  .main {
+    font: inherit;
+    font-size: clamp(1.15rem, 2.4vw, 1.45rem);
+    font-weight: 500;
+    width: 100%;
+    min-height: 88px;
+    border: none;
+    border-radius: 22px;
+    background: var(--btn);
+    color: var(--btn-ink);
+    cursor: pointer;
+    transition: transform .08s ease;
+  }
+  .main:active { transform: scale(.985); }
+
+  :focus-visible { outline: 2px solid var(--fill); outline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) {
+    .main:active { transform: none; }
+  }
+</style>
+</head>
+<body class="ready">
+<main class="app">
+  <header class="bar">
+    <button type="button" id="pipBtn" class="tool" hidden title="画面右上に小さく出す">小窓</button>
+    <button type="button" id="logBtn" class="tool">記録</button>
+    <button type="button" id="pauseBtn" class="tool" hidden>一時停止</button>
+    <button type="button" id="finishBtn" class="tool" hidden>終わる</button>
+  </header>
+
+  <section class="stage">
+    <div id="word" class="word">準備</div>
+    <p id="note" class="note">QBで問題を開いたらスタート</p>
+  </section>
+
+  <section class="summary" aria-live="polite">
+    <p id="thanks" class="thanks"></p>
+    <p class="today"><b id="todayQ">0</b><span>問</span></p>
+    <p id="todayTime" class="sub">今日の演習 0分</p>
+    <div id="grid" class="grid" role="img" aria-label="直近8週間の演習量"></div>
+    <p class="caption">直近8週間</p>
+    <p id="total" class="total"></p>
+  </section>
+
+  <button type="button" id="mainBtn" class="main">演習スタート</button>
+</main>
+
+<script>
+(() => {
+  const LIMIT = 180;              // 解説の目安（秒）
+  const CAP = 30 * 60;            // 1フェーズで記録する上限（放置したとき用）
+  const DAY_START_HOUR = 4;       // 朝4時までは前日あつかい
+  const LS_KEY = 'qbtimer:log:v1';
+
+  const $ = id => document.getElementById(id);
+  const body = document.body;
+  const wordEl = $('word'), noteEl = $('note'), thanksEl = $('thanks');
+  const mainBtn = $('mainBtn'), pauseBtn = $('pauseBtn'), finishBtn = $('finishBtn'), logBtn = $('logBtn'), pipBtn = $('pipBtn');
+  const todayQEl = $('todayQ'), todayTimeEl = $('todayTime'), gridEl = $('grid'), totalEl = $('total');
+
+  let phase = 'ready';   // ready | q（演習） | a（解説） | summary（積み上げ）
+  let startedAt = 0;
+  let pausedAt = null;
+  let wakeLock = null;
+
+  /* ---------- 記録（この端末の localStorage に保存） ---------- */
+  let days = {};
+
+  function cloneDays(src) {
+    const out = {};
+    for (const k in src) {
+      const d = src[k] || {};
+      out[k] = { q: Number(d.q) || 0, sec: Number(d.sec) || 0 };
+    }
+    return out;
+  }
+
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.days === 'object') days = cloneDays(parsed.days);
+    }
+  } catch (_) {}
+
+  function persist() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ days })); } catch (_) {}
+  }
+
+  const keyOf = d =>
+    d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const shifted = () => new Date(Date.now() - DAY_START_HOUR * 3600e3);
+  const todayKey = () => keyOf(shifted());
+  function todayEntry() {
+    const k = todayKey();
+    return days[k] || (days[k] = { q: 0, sec: 0 });
+  }
+  function addTime(sec) {
+    const d = todayEntry();
+    d.sec = Math.round(d.sec + Math.min(CAP, Math.max(0, sec)));
+  }
+  function addQuestion() { todayEntry().q += 1; }
+
+  /* ---------- 表示 ---------- */
+  const elapsed = () =>
+    (phase === 'q' || phase === 'a')
+      ? ((pausedAt !== null ? pausedAt : Date.now()) - startedAt) / 1000
+      : 0;
+
+  function fmtDur(sec) {
+    const m = Math.floor(sec / 60);
+    const h = Math.floor(m / 60);
+    const mm = m % 60;
+    return h ? h + '時間' + (mm ? mm + '分' : '') : m + '分';
+  }
+  const level = q => q === 0 ? 0 : q < 30 ? 1 : q < 60 ? 2 : q < 100 ? 3 : 4;
+
+  function renderSummary() {
+    const t = days[todayKey()] || { q: 0, sec: 0 };
+    todayQEl.textContent = t.q.toLocaleString('ja-JP');
+    todayTimeEl.textContent = '今日の演習 ' + fmtDur(t.sec);
+
+    let tq = 0, ts = 0;
+    for (const k in days) { tq += days[k].q; ts += days[k].sec; }
+    totalEl.textContent = 'これまで ' + tq.toLocaleString('ja-JP') + '問、' + fmtDur(ts);
+
+    const base = shifted();
+    base.setHours(12, 0, 0, 0);
+    const frag = document.createDocumentFragment();
+    for (let i = 55; i >= 0; i--) {
+      const d = new Date(base);
+      d.setDate(base.getDate() - i);
+      const k = keyOf(d);
+      const q = days[k] ? days[k].q : 0;
+      const cell = document.createElement('i');
+      cell.className = 'l' + level(q) + (i === 0 ? ' now' : '');
+      cell.title = (d.getMonth() + 1) + '/' + d.getDate() + ' ' + q + '問';
+      frag.appendChild(cell);
+    }
+    gridEl.replaceChildren(frag);
+  }
+
+  function labels() {
+    const paused = pausedAt !== null;
+    return {
+      word: phase === 'q' ? '演習' : phase === 'a' ? '解説' : '準備',
+      note:
+        paused ? '一時停止中' :
+        phase === 'q' ? '解き終わったら解説へ' :
+        phase === 'a' ? '色が変わったら3分経過' :
+        'QBで問題を開いたらスタート',
+      main:
+        paused ? '再開' :
+        phase === 'q' ? '解説を見る' :
+        phase === 'a' ? '次の問題へ' :
+        phase === 'summary' ? 'タイマーに戻る' : '演習スタート',
+      pause: paused ? '再開' : '一時停止',
+    };
+  }
+
+  function render() {
+    const paused = pausedAt !== null;
+    const inSession = phase === 'q' || phase === 'a';
+    const over = phase === 'a' && elapsed() >= LIMIT;
+    const L = labels();
+
+    if (phase !== 'summary') {
+      wordEl.textContent = L.word;
+      noteEl.textContent = pip ? '小窓で表示中' : L.note;
+    }
+
+    body.classList.toggle('over', over);
+    body.classList.toggle('ready', phase === 'ready');
+    body.classList.toggle('paused', paused);
+    body.classList.toggle('view-summary', phase === 'summary');
+
+    mainBtn.textContent = L.main;
+    pauseBtn.hidden = finishBtn.hidden = !inSession;
+    logBtn.hidden = phase !== 'ready';
+    pauseBtn.textContent = L.pause;
+    pipBtn.hidden = !PIP_OK || phase === 'summary';
+    pipBtn.textContent = pip ? '小窓を閉じる' : '小窓';
+
+    if (pip) {
+      const pb = pip.win.document.body;
+      pb.classList.toggle('over', over);
+      pb.classList.toggle('ready', phase === 'ready');
+      pb.classList.toggle('paused', paused);
+      pip.word.textContent = L.word;
+      pip.main.textContent = L.main;
+      pip.pause.textContent = L.pause;
+      pip.pause.hidden = !inSession;
+      pip.finish.hidden = !inSession;
+    }
+  }
+
+  /* ---------- 操作 ---------- */
+  function advance() {
+    if (pausedAt !== null) { togglePause(); return; }
+    if (phase === 'summary') { phase = 'ready'; render(); return; }
+    const e = elapsed();
+    if (phase === 'q') {
+      addQuestion(); addTime(e); persist();
+      phase = 'a';
+    } else if (phase === 'a') {
+      addTime(e); persist();
+      phase = 'q';
+    } else {
+      phase = 'q';
+    }
+    startedAt = Date.now();
+    requestWake();
+    render();
+  }
+
+  function togglePause() {
+    if (phase !== 'q' && phase !== 'a') return;
+    if (pausedAt === null) {
+      pausedAt = Date.now();
+    } else {
+      startedAt += Date.now() - pausedAt;
+      pausedAt = null;
+    }
+    render();
+  }
+
+  function finish() {
+    if (phase === 'q' || phase === 'a') { addTime(elapsed()); persist(); }
+    pausedAt = null;
+    phase = 'summary';
+    thanksEl.textContent = 'おつかれさま';
+    releaseWake();
+    if (pip) pip.win.close();
+    renderSummary();
+    render();
+  }
+
+  function showLog() {
+    phase = 'summary';
+    thanksEl.textContent = '';
+    renderSummary();
+    render();
+  }
+
+  // 画面スリープ防止（対応ブラウザのみ。非対応なら何もしない）
+  async function requestWake() {
+    try {
+      if ('wakeLock' in navigator && !wakeLock) {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { wakeLock = null; });
+      }
+    } catch (_) { wakeLock = null; }
+  }
+  function releaseWake() {
+    try { if (wakeLock) wakeLock.release(); } catch (_) {}
+    wakeLock = null;
+  }
+
+  /* ---------- PC 用の小窓（Document Picture-in-Picture） ---------- */
+  // 対応：デスクトップ版 Chrome / Edge 116+、Firefox 151+。非対応ならボタンを出さない。
+  const PIP_OK = 'documentPictureInPicture' in window;
+  let pip = null;
+
+  const PIP_CSS = `
+    :root { --bg:#E6EBEE; --bg-over:#ECE3E1; --ink:#1E2B33; --ink-soft:#5B6B75; --line:#C7D0D6; --btn:#1E2B33; --btn-ink:#F2F5F7; color-scheme: light; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg:#172128; --bg-over:#261E22; --ink:#D5DEE3; --ink-soft:#82939D; --line:#2D3B44; --btn:#D5DEE3; --btn-ink:#172128; color-scheme: dark; }
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      background: var(--bg); color: var(--ink);
+      font-family: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic UI", system-ui, sans-serif;
+      transition: background-color 2.5s ease;
+      user-select: none; overflow: hidden;
+      display: grid; grid-template-rows: 1fr auto; gap: 8px; padding: 10px;
+    }
+    body.over { background: var(--bg-over); }
+    .word { display: flex; align-items: center; justify-content: center; font-size: clamp(24px, 28vmin, 72px); letter-spacing: .12em; padding-left: .12em; line-height: 1; min-height: 0; transition: opacity .2s, color .3s; }
+    body.ready .word { color: var(--ink-soft); }
+    body.paused .word { opacity: .4; }
+    .row { display: flex; gap: 6px; }
+    button { font: inherit; font-size: 14px; min-height: 40px; border-radius: 12px; cursor: pointer; border: none; }
+    .main { flex: 1; background: var(--btn); color: var(--btn-ink); font-weight: 500; }
+    .ghost { background: transparent; color: var(--ink-soft); border: 1px solid var(--line); padding: 0 12px; }
+    [hidden] { display: none !important; }
+    :focus-visible { outline: 2px solid var(--ink-soft); outline-offset: 2px; }
+  `;
+
+  async function togglePip() {
+    if (!PIP_OK) return;
+    if (pip) { pip.win.close(); return; }
+    try {
+      const win = await window.documentPictureInPicture.requestWindow({ width: 300, height: 190 });
+      const d = win.document;
+      d.documentElement.lang = 'ja';
+      d.title = 'QB 3分';
+      const font = d.createElement('link');
+      font.rel = 'stylesheet';
+      font.href = 'https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500&display=swap';
+      d.head.appendChild(font);
+      const style = d.createElement('style');
+      style.textContent = PIP_CSS;
+      d.head.appendChild(style);
+
+      const word = d.createElement('div'); word.className = 'word';
+      const row = d.createElement('div'); row.className = 'row';
+      const main = d.createElement('button'); main.className = 'main';
+      const pause = d.createElement('button'); pause.className = 'ghost';
+      const fin = d.createElement('button'); fin.className = 'ghost'; fin.textContent = '終わる';
+      row.append(main, pause, fin);
+      d.body.append(word, row);
+
+      main.addEventListener('click', advance);
+      pause.addEventListener('click', togglePause);
+      fin.addEventListener('click', finish);
+      d.addEventListener('keydown', onKey);
+      win.addEventListener('pagehide', () => { pip = null; render(); });
+
+      pip = { win, word, main, pause, finish: fin };
+      render();
+    } catch (_) { pip = null; render(); }
+  }
+
+  mainBtn.addEventListener('click', advance);
+  pauseBtn.addEventListener('click', togglePause);
+  finishBtn.addEventListener('click', finish);
+  logBtn.addEventListener('click', showLog);
+  pipBtn.addEventListener('click', togglePip);
+
+  // 外付けキーボード用：Space / Enter で次へ、P で一時停止
+  function onKey(e) {
+    if (e.target.closest && e.target.closest('button')) return;
+    if (e.code === 'Space' || e.key === 'Enter') { e.preventDefault(); advance(); }
+    else if (e.key === 'p' || e.key === 'P') togglePause();
+  }
+  document.addEventListener('keydown', onKey);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && (phase === 'q' || phase === 'a')) requestWake();
+    render();
+  });
+
+  setInterval(render, 500);
+  render();
+
+  // オフラインでも開けるように（対応ブラウザのみ）
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
+})();
+</script>
+</body>
+</html>
