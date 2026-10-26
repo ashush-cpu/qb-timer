@@ -1,6 +1,6 @@
 // QB 解説3分タイマー – service worker
 // 方針：自分のファイルは「キャッシュを先に返し、裏で更新」。フォントも同じ。
-const VERSION = 'qbtimer-v1';
+const VERSION = 'qbtimer-v2';
 const SHELL = [
   './',
   './index.html',

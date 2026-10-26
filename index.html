@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>QB 解説3分タイマー</title>
-<meta name="description" content="QBの解説を3分読んでも分からなければスキップする、そのための静かなタイマー。">
+<meta name="description" content="QBは演習2分・解説3分で区切る。そのための、音も数字も出さない静かなタイマー。">
 <!-- 外部から読み込むのは Google Fonts だけ。それ以外のスクリプト・接続・埋め込みを禁止する -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-MeM+sCxJotX7raUVW5dYAuPOJzWmEUbLp1kP2oSH1AY='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-ItpUtlwvJ63M02t8kIBOuNjaYuJd9FsOjNSSExN68Zs='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#E6EBEE">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#172128">
@@ -217,7 +217,8 @@
 
 <script>
 (() => {
-  const LIMIT = 180;              // 解説の目安（秒）
+  const Q_LIMIT = 120;            // 演習の目安（秒）。超えたら背景色が変わる
+  const A_LIMIT = 180;            // 解説の目安（秒）。超えたら背景色が変わる
   const CAP = 30 * 60;            // 1フェーズで記録する上限（放置したとき用）
   const DAY_START_HOUR = 4;       // 朝4時までは前日あつかい
   const LS_KEY = 'qbtimer:log:v1';
@@ -316,7 +317,7 @@
       word: phase === 'q' ? '演習' : phase === 'a' ? '解説' : '準備',
       note:
         paused ? '一時停止中' :
-        phase === 'q' ? '解き終わったら解説へ' :
+        phase === 'q' ? '色が変わったら2分経過' :
         phase === 'a' ? '色が変わったら3分経過' :
         'QBで問題を開いたらスタート',
       main:
@@ -331,7 +332,7 @@
   function render() {
     const paused = pausedAt !== null;
     const inSession = phase === 'q' || phase === 'a';
-    const over = phase === 'a' && elapsed() >= LIMIT;
+    const over = (phase === 'q' && elapsed() >= Q_LIMIT) || (phase === 'a' && elapsed() >= A_LIMIT);
     const L = labels();
 
     if (phase !== 'summary') {
